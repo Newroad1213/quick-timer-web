@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>컬러풀 심플 타이머</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Jua (귀엽고 큼직한 한글 폰트), Black Han Sans (선명하고 굵은 숫자) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Jua', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .font-big-num {
+      font-family: 'Black Han Sans', 'Jua', sans-serif;
+      letter-spacing: 2px;
+      line-height: 1;
+    }
+    
+    /* 시간 종료 깜빡임 애니메이션 (밝은 테마용 파스텔 레드 ↔ 옐로우 플래시) */
+    @keyframes flash-screen {
+      0%, 100% {
+        background-color: #fef2f2;
+      }
+      50% {
+        background-color: #fca5a5;
+      }
+    }
+
+    .time-ended-flash {
+      animation: flash-screen 0.8s infinite ease-in-out;
+    }
+
+    /* 알림 배너 펄스 효과 */
+    @keyframes bounce-scale {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .pulse-scale {
+      animation: bounce-scale 1s infinite ease-in-out;
+    }
+
+    /* SVG 원형 프로그레스 바 부드러운 전환 */
+    #progress-circle {
+      transition: stroke-dashoffset 0.25s linear, stroke 0.3s ease;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+  </style>
+</head>
+<body id="main-body" class="bg-gradient-to-br from-amber-50 via-rose-50 to-sky-50 text-slate-700 min-h-screen flex items-center justify-center p-4 transition-colors duration-300">
+
+  <!-- 메인 타이머 카드 컨테이너 (밝고 부드러운 화이트 클라우드 카드) -->
+  <main class="w-full max-w-md bg-white/90 backdrop-blur-xl border-4 border-amber-200/80 rounded-[2.5rem] p-6 sm:p-8 shadow-[0_20px_50px_rgba(245,158,11,0.15)] relative overflow-hidden">
+    
+    <!-- 장식용 배경 블러 글로우 (파스텔 톤) -->
+    <div class="absolute -top-12 -left-12 w-48 h-48 bg-pink-200/50 rounded-full blur-2xl pointer-events-none"></div>
+    <div class="absolute -bottom-12 -right-12 w-48 h-48 bg-sky-200/50 rounded-full blur-2xl pointer-events-none"></div>
+
+    <!-- 상단 헤더 -->
+    <header class="flex items-center justify-between mb-2 relative z-10">
+      <div>
+        <h1 class="text-3xl sm:text-4xl font-bold tracking-wide text-rose-500 flex items-center gap-1.5">
+          <span>✨</span>
+          <span>심플 타이머</span>
+        </h1>
+        <p class="text-lg text-slate-500 font-bold ml-1 mt-0.5">최대 60분까지 맞출 수 있어요! 🧁</p>
+      </div>
+      <!-- 사운드 토글 버튼 -->
+      <button id="sound-toggle-btn" class="px-3.5 py-2 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-900 transition-all border-2 border-amber-300 text-lg font-bold flex items-center gap-1.5 shadow-sm active:scale-95" title="알람 소리 켜기/끄기">
+        <span id="sound-icon" class="text-xl">🔔</span>
+        <span id="sound-status-text" class="text-base">소리 ON</span>
+      </button>
+    </header>
+
+    <!-- 원형 프로그레스 & 시간 디스플레이 영역 -->
+    <div class="relative flex items-center justify-center my-3">
+      <svg class="w-72 h-72 sm:w-80 sm:h-80 drop-shadow-md" viewBox="0 0 240 240">
+        <!-- 배경 트랙 원 (부드러운 크림 베이지) -->
+        <circle
+          cx="120"
+          cy="120"
+          r="100"
+          fill="#fffbeb"
+          stroke="#fed7aa"
+          stroke-width="15"
+        />
+        <!-- 진행 바 원 (코랄 핑크) -->
+        <circle
+          id="progress-circle"
+          cx="120"
+          cy="120"
+          r="100"
+          fill="transparent"
+          stroke="#fb7185"
+          stroke-width="15"
+          stroke-dasharray="628.3"
+          stroke-dashoffset="0"
+          stroke-linecap="round"
+        />
+      </svg>
+
+      <!-- 중앙 텍스트 콘텐츠 -->
+      <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 pt-2">
+        <div id="status-tag" class="text-lg font-bold px-4 py-1 rounded-full bg-rose-100 text-rose-600 mb-2 border-2 border-rose-300 shadow-sm">
+          대기 중 💤
+        </div>
+        <!-- 메인 시간 디스플레이 (MM:SS) - 크고 선명한 고딕 볼드 폰트 적용 -->
+        <div id="time-display" class="font-big-num text-7xl sm:text-8xl font-black text-slate-800 drop-shadow select-text">
+          00:00
+        </div>
+        <div id="max-limit-notice" class="h-6 text-base text-amber-600 font-bold transition-opacity opacity-0 flex items-center gap-1 mt-1">
+          <span>⚠️</span> 최대 60분까지 가능해요!
+        </div>
+      </div>
+    </div>
+
+    <!-- 1초 단위 미세 조정 버튼 (+, -) -->
+    <section class="mb-4 relative z-10">
+      <div class="text-center text-lg font-bold text-slate-600 mb-1.5 flex items-center justify-center gap-1">
+        <span>🐾 1초 단위 조절</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <button 
+          id="sec-minus-btn" 
+          class="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-2xl border-2 border-rose-300 active:scale-95 transition-all shadow-sm">
+          <svg class="w-6 h-6 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>- 1초</span>
+        </button>
+
+        <button 
+          id="sec-plus-btn" 
+          class="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-bold text-2xl border-2 border-emerald-300 active:scale-95 transition-all shadow-sm">
+          <svg class="w-6 h-6 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>+ 1초</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 분 단위 빠른 추가 버튼 (1분, 5분, 10분) - 큼직한 파스텔 젤리 버튼 스타일 -->
+    <section class="mb-5 relative z-10">
+      <div class="text-center text-lg font-bold text-slate-600 mb-1.5">
+        <span>🍬 시간 누적 추가</span>
+      </div>
+      <div class="grid grid-cols-3 gap-2.5">
+        <!-- 1분 버튼: 파스텔 하늘 -->
+        <button 
+          id="add-1m-btn" 
+          class="py-3 px-2 rounded-2xl bg-sky-100 hover:bg-sky-200 text-sky-900 font-bold text-2xl shadow-sm border-2 border-sky-300 active:scale-95 transition-transform flex flex-col items-center justify-center">
+          <span class="text-sm font-bold text-sky-600 tracking-wider">+1 MIN</span>
+          <span>+ 1분</span>
+        </button>
+
+        <!-- 5분 버튼: 파스텔 라벤더 -->
+        <button 
+          id="add-5m-btn" 
+          class="py-3 px-2 rounded-2xl bg-purple-100 hover:bg-purple-200 text-purple-900 font-bold text-2xl shadow-sm border-2 border-purple-300 active:scale-95 transition-transform flex flex-col items-center justify-center">
+          <span class="text-sm font-bold text-purple-600 tracking-wider">+5 MIN</span>
+          <span>+ 5분</span>
+        </button>
+
+        <!-- 10분 버튼: 파스텔 살구 오렌지 -->
+        <button 
+          id="add-10m-btn" 
+          class="py-3 px-2 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-2xl shadow-sm border-2 border-amber-300 active:scale-95 transition-transform flex flex-col items-center justify-center">
+          <span class="text-sm font-bold text-amber-600 tracking-wider">+10 MIN</span>
+          <span>+ 10분</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 주 제어 버튼 영역 (Start/Stop, Reset) -->
+    <section class="grid grid-cols-2 gap-3 pt-3 border-t-2 border-dashed border-amber-200 relative z-10">
+      <!-- Start / Stop 전환 버튼 -->
+      <button 
+        id="start-stop-btn" 
+        class="py-3.5 px-4 rounded-2xl font-bold text-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 text-white border-2 border-emerald-500/40">
+        <svg id="start-stop-icon" class="w-6 h-6 fill-current" viewBox="0 0 24 24">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        <span id="start-stop-label">시작!</span>
+      </button>
+
+      <!-- Reset 버튼: 화사한 코랄 핑크 -->
+      <button 
+        id="reset-btn" 
+        class="py-3.5 px-4 rounded-2xl font-bold text-2xl bg-gradient-to-r from-rose-400 to-pink-400 hover:from-rose-500 hover:to-pink-500 text-white transition-all active:scale-95 shadow-md border-2 border-rose-400 flex items-center justify-center gap-2">
+        <svg class="w-6 h-6 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+          <path d="M3 3v5h5"></path>
+        </svg>
+        <span>초기화</span>
+      </button>
+    </section>
+
+    <!-- 단축키 안내 풋터 -->
+    <footer class="mt-4 text-center text-base font-bold text-slate-500 flex justify-center gap-4">
+      <span>⌨️ <kbd class="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 text-sm font-sans">Space</kbd> 시작/정지</span>
+      <span><kbd class="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-900 border border-rose-300 text-sm font-sans">R</kbd> 리셋</span>
+    </footer>
+
+    <!-- 시간 종료 오버레이 모달 배너 (귀여운 파스텔 팝업) -->
+    <div id="ended-overlay" class="absolute inset-0 bg-white/95 backdrop-blur-md z-30 hidden flex-col items-center justify-center p-6 text-center">
+      <div class="pulse-scale flex flex-col items-center">
+        <div class="w-24 h-24 rounded-full bg-rose-100 border-4 border-rose-400 flex items-center justify-center text-5xl mb-4 shadow-lg shadow-rose-300/50">
+          ⏰
+        </div>
+        <h2 class="text-4xl sm:text-5xl font-extrabold text-rose-500 mb-2 tracking-wide">시간 종료!! 🎉</h2>
+        <p class="text-2xl text-slate-700 mb-6 font-bold">약속한 시간이 다 되었어요!</p>
+        <button 
+          id="confirm-ended-btn" 
+          class="px-10 py-3.5 rounded-2xl bg-gradient-to-r from-rose-400 to-pink-500 hover:from-rose-500 hover:to-pink-600 text-white font-bold shadow-lg shadow-rose-400/40 active:scale-95 transition-all text-2xl border-2 border-rose-300">
+          알람 끄기 🧸
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- 자바스크립트 로직 -->
+  <script>
+    // 최대 허용 시간: 60분 (초 단위 = 3600초)
+    const MAX_SECONDS = 60 * 60;
+    const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * 100; // r=100 -> ~628.318
+
+    // 상태 변수
+    let totalTargetSeconds = 0;   // 프로그레스 바 계산 기준 설정값
+    let remainingSeconds = 0;     // 현재 남은 초
+    let timerInterval = null;     // setInterval 참조
+    let isRunning = false;        // 실행 상태
+    let isSoundOn = true;         // 사운드 활성화 여부
+    let soundInterval = null;     // 비프음 연속 재생 타이머
+
+    // DOM 엘리먼트 캐싱
+    const mainBody = document.getElementById('main-body');
+    const timeDisplay = document.getElementById('time-display');
+    const statusTag = document.getElementById('status-tag');
+    const progressCircle = document.getElementById('progress-circle');
+    const maxNotice = document.getElementById('max-limit-notice');
+    
+    // 버튼 DOM
+    const startStopBtn = document.getElementById('start-stop-btn');
+    const startStopLabel = document.getElementById('start-stop-label');
+    const startStopIcon = document.getElementById('start-stop-icon');
+    const resetBtn = document.getElementById('reset-btn');
+    
+    const secPlusBtn = document.getElementById('sec-plus-btn');
+    const secMinusBtn = document.getElementById('sec-minus-btn');
+    const add1mBtn = document.getElementById('add-1m-btn');
+    const add5mBtn = document.getElementById('add-5m-btn');
+    const add10mBtn = document.getElementById('add-10m-btn');
+
+    const soundToggleBtn = document.getElementById('sound-toggle-btn');
+    const soundIcon = document.getElementById('sound-icon');
+    const soundStatusText = document.getElementById('sound-status-text');
+
+    const endedOverlay = document.getElementById('ended-overlay');
+    const confirmEndedBtn = document.getElementById('confirm-ended-btn');
+
+    // Web Audio API를 활용한 알람 신호음 생성기 (외부 오디오 파일 불필요)
+    let audioCtx = null;
+    function playBeep(freq = 880, duration = 0.2) {
+      if (!isSoundOn) return;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.warn('Audio play error:', e);
+      }
+    }
+
+    // 시간 종료 시 반복 울리는 알람 시작
+    function startAlarmSound() {
+      if (!isSoundOn) return;
+      playBeep(980, 0.25);
+      soundInterval = setInterval(() => {
+        playBeep(880, 0.2);
+        setTimeout(() => playBeep(1100, 0.2), 220);
+      }, 900);
+    }
+
+    // 알람 사운드 중지
+    function stopAlarmSound() {
+      if (soundInterval) {
+        clearInterval(soundInterval);
+        soundInterval = null;
+      }
+    }
+
+    // 시간 포맷팅 함수 (MM:SS)
+    function formatTime(totalSec) {
+      const minutes = Math.floor(totalSec / 60);
+      const seconds = totalSec % 60;
+      const mm = String(minutes).padStart(2, '0');
+      const ss = String(seconds).padStart(2, '0');
+      return `${mm}:${ss}`;
+    }
+
+    // 디스플레이 및 프로그레스 링 갱신
+    function updateDisplay() {
+      timeDisplay.textContent = formatTime(remainingSeconds);
+
+      // 브라우저 탭 타이틀에 반영
+      if (isRunning) {
+        document.title = `(${formatTime(remainingSeconds)}) 심플 타이머`;
+      } else {
+        document.title = '컬러풀 심플 타이머';
+      }
+
+      // 프로그레스 바 계산
+      if (totalTargetSeconds <= 0 || remainingSeconds <= 0) {
+        progressCircle.style.strokeDashoffset = CIRCLE_CIRCUMFERENCE;
+      } else {
+        const ratio = remainingSeconds / totalTargetSeconds;
+        const offset = CIRCLE_CIRCUMFERENCE * (1 - ratio);
+        progressCircle.style.strokeDashoffset = offset;
+      }
+
+      // 시간에 따른 프로그레스 색상 강조
+      if (remainingSeconds <= 10 && remainingSeconds > 0) {
+        progressCircle.setAttribute('stroke', '#f43f5e'); // 종료 직전 비비드 로즈
+      } else if (remainingSeconds <= 30 && remainingSeconds > 0) {
+        progressCircle.setAttribute('stroke', '#f59e0b'); // 경고 살구 주황
+      } else {
+        progressCircle.setAttribute('stroke', '#fb7185'); // 기본 파스텔 코랄
+      }
+    }
+
+    // 60분 최대 도달 알림 메시지 일시 표시
+    let noticeTimeout = null;
+    function showMaxNotice() {
+      maxNotice.classList.remove('opacity-0');
+      maxNotice.classList.add('opacity-100');
+      clearTimeout(noticeTimeout);
+      noticeTimeout = setTimeout(() => {
+        maxNotice.classList.remove('opacity-100');
+        maxNotice.classList.add('opacity-0');
+      }, 2000);
+    }
+
+    // 시간 변경 공통 함수
+    function adjustTime(secondsToAdd) {
+      // 종료 화면이 떠 있다면 먼저 닫기
+      if (!endedOverlay.classList.contains('hidden')) {
+        closeEndedNotice();
+      }
+
+      let newSeconds = remainingSeconds + secondsToAdd;
+
+      if (newSeconds > MAX_SECONDS) {
+        newSeconds = MAX_SECONDS;
+        showMaxNotice();
+      } else if (newSeconds < 0) {
+        newSeconds = 0;
+      }
+
+      remainingSeconds = newSeconds;
+
+      // 타이머가 멈춘 상태에서 시간을 늘리면 기준 목표치도 같이 증가
+      if (!isRunning) {
+        totalTargetSeconds = remainingSeconds;
+      } else {
+        if (remainingSeconds > totalTargetSeconds) {
+          totalTargetSeconds = remainingSeconds;
+        }
+      }
+
+      updateDisplay();
+    }
+
+    // 시작/정지 토글 함수
+    function toggleStartStop() {
+      if (remainingSeconds <= 0) {
+        // 시간이 0인 상태에서 시작을 누르면 기본 1분 제공
+        adjustTime(60);
+      }
+
+      if (isRunning) {
+        // 멈춤 (STOP)
+        stopTimer();
+      } else {
+        // 시작 (START)
+        startTimer();
+      }
+    }
+
+    // 타이머 시작
+    function startTimer() {
+      if (isRunning || remainingSeconds <= 0) return;
+      
+      isRunning = true;
+      if (totalTargetSeconds < remainingSeconds) {
+        totalTargetSeconds = remainingSeconds;
+      }
+
+      // UI 변경 (Stop 상태로 전환 - 귀여운 오렌지/옐로우)
+      startStopLabel.textContent = 'STOP (멈춤)';
+      startStopBtn.className = 'py-3.5 px-4 rounded-2xl font-bold text-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500 text-white border-2 border-amber-400/50';
+      startStopIcon.innerHTML = '<rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect>';
+      
+      statusTag.textContent = '달리는 중! 🏃‍♂️';
+      statusTag.className = 'text-lg font-bold px-4 py-1 rounded-full bg-emerald-100 text-emerald-700 mb-2 border-2 border-emerald-300 shadow-sm';
+
+      // 1초 주기로 차감
+      timerInterval = setInterval(() => {
+        if (remainingSeconds > 0) {
+          remainingSeconds--;
+          updateDisplay();
+
+          if (remainingSeconds === 0) {
+            handleTimeEnded();
+          }
+        }
+      }, 1000);
+      
+      updateDisplay();
+    }
+
+    // 타이머 일시정지 (STOP)
+    function stopTimer() {
+      if (!isRunning) return;
+      clearInterval(timerInterval);
+      timerInterval = null;
+      isRunning = false;
+
+      // UI 변경 (Start 상태로 복귀)
+      startStopLabel.textContent = '시작!';
+      startStopBtn.className = 'py-3.5 px-4 rounded-2xl font-bold text-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 text-white border-2 border-emerald-500/40';
+      startStopIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+      
+      statusTag.textContent = '잠깐 멈춤 ☕';
+      statusTag.className = 'text-lg font-bold px-4 py-1 rounded-full bg-amber-100 text-amber-700 mb-2 border-2 border-amber-300 shadow-sm';
+      
+      document.title = `[정지] ${formatTime(remainingSeconds)} - 심플 타이머`;
+    }
+
+    // 리셋 (RESET)
+    function resetTimer() {
+      stopTimer();
+      stopAlarmSound();
+      remainingSeconds = 0;
+      totalTargetSeconds = 0;
+      
+      statusTag.textContent = '대기 중 💤';
+      statusTag.className = 'text-lg font-bold px-4 py-1 rounded-full bg-rose-100 text-rose-600 mb-2 border-2 border-rose-300 shadow-sm';
+
+      closeEndedNotice();
+      updateDisplay();
+    }
+
+    // 시간 종료 처리: 화면 깜빡임 + 메시지 팝업 + 소리
+    function handleTimeEnded() {
+      stopTimer();
+
+      // 화면 깜빡임 애니메이션 활성화
+      mainBody.classList.add('time-ended-flash');
+
+      // 종료 팝업 표시
+      endedOverlay.classList.remove('hidden');
+      endedOverlay.classList.add('flex');
+
+      // 알람 소리 시작
+      startAlarmSound();
+    }
+
+    // 종료 안내 모달 닫기
+    function closeEndedNotice() {
+      mainBody.classList.remove('time-ended-flash');
+      endedOverlay.classList.add('hidden');
+      endedOverlay.classList.remove('flex');
+      stopAlarmSound();
+    }
+
+    // 버튼 이벤트 연결
+    // 1초 단위 +, - 버튼
+    secPlusBtn.addEventListener('click', () => adjustTime(1));
+    secMinusBtn.addEventListener('click', () => adjustTime(-1));
+
+    // 1분, 5분, 10분 누적 추가 버튼
+    add1mBtn.addEventListener('click', () => adjustTime(60));
+    add5mBtn.addEventListener('click', () => adjustTime(5 * 60));
+    add10mBtn.addEventListener('click', () => adjustTime(10 * 60));
+
+    // 제어 버튼
+    startStopBtn.addEventListener('click', toggleStartStop);
+    resetBtn.addEventListener('click', resetTimer);
+    confirmEndedBtn.addEventListener('click', closeEndedNotice);
+
+    // 사운드 토글
+    soundToggleBtn.addEventListener('click', () => {
+      isSoundOn = !isSoundOn;
+      if (isSoundOn) {
+        soundIcon.textContent = '🔔';
+        soundStatusText.textContent = '소리 ON';
+        soundToggleBtn.classList.remove('opacity-60', 'bg-slate-100');
+        soundToggleBtn.classList.add('bg-amber-100');
+        playBeep(700, 0.1);
+      } else {
+        soundIcon.textContent = '🔕';
+        soundStatusText.textContent = '음소거';
+        soundToggleBtn.classList.add('opacity-60', 'bg-slate-100');
+        soundToggleBtn.classList.remove('bg-amber-100');
+        stopAlarmSound();
+      }
+    });
+
+    // 키보드 단축키 지원 (Space: 시작/일시정지, R or Esc: 리셋)
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        toggleStartStop();
+      } else if (e.code === 'KeyR' || e.key === 'r' || e.key === 'R') {
+        resetTimer();
+      } else if (e.code === 'Escape') {
+        closeEndedNotice();
+      }
+    });
+
+    // 초기 디스플레이 설정
+    updateDisplay();
+  </script>
+</body>
+</html>
